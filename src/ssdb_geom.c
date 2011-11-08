@@ -22,10 +22,10 @@ ssdb_point_t* ssdb_point_new(void) {
     return p;
 }
 
-void ssdb_point_destroy(ssdb_point_t* p) {
+ssdb_point_t* ssdb_point_destroy(ssdb_point_t* p) {
     free(p);
     p = NULL;
-    return;
+    return p;
 }
 
 int ssdb_point_equals(ssdb_point_t* p1, ssdb_point_t* p2) {
@@ -56,20 +56,29 @@ double ssdb_point_distance_lambert(ssdb_point_t* p1, ssdb_point_t* p2) {
     return d;
 }
 
-void ssdb_linestring_init(ssdb_linestring_t* l) {
+ssdb_bbox_t* ssdb_point_bbox(ssdb_point_t* p) {
+    ssdb_bbox_t* b = ssdb_bbox_new();
+    b->latmax = p->lat;
+    b->lonmax = p->lon;
+    b->latmin = p->lat;
+    b->lonmin = p->lon;
+    return b;
+}
+
+void ssdb_linestr_init(ssdb_linestr_t* l) {
     l->type = GEOM_LINESTRING;
     l->num_points = 0;
     l->points = NULL;
 }
 
-ssdb_linestring_t* ssdb_linestring_new(void) {
-    ssdb_linestring_t* l = malloc(sizeof(ssdb_linestring_t));
+ssdb_linestr_t* ssdb_linestr_new(void) {
+    ssdb_linestr_t* l = malloc(sizeof(ssdb_linestr_t));
     if(l == NULL) abort();
-    ssdb_linestring_init(l);
+    ssdb_linestr_init(l);
     return l;
 }
 
-void ssdb_linestring_destroy(ssdb_linestring_t* l) {
+ssdb_linestr_t* ssdb_linestr_destroy(ssdb_linestr_t* l) {
     int i;
     for(i=0; i<l->num_points; i++) {
         ssdb_point_destroy(l->points[i]);
@@ -79,10 +88,10 @@ void ssdb_linestring_destroy(ssdb_linestring_t* l) {
     l->points = NULL;
     free(l);
     l = NULL;
-    return;
+    return l;
 }
 
-int ssdb_linestring_append(ssdb_linestring_t* l, ssdb_point_t* p) {
+int ssdb_linestr_append(ssdb_linestr_t* l, ssdb_point_t* p) {
     l->points = realloc(l->points, sizeof(ssdb_point_t*)*(l->num_points+1));
     if(l->points) {
         l->num_points++;
@@ -93,11 +102,61 @@ int ssdb_linestring_append(ssdb_linestring_t* l, ssdb_point_t* p) {
     return l->num_points;
 }
 
-double ssdb_linestring_length(ssdb_linestring_t* l) {
+double ssdb_linestr_length(ssdb_linestr_t* l) {
     double len = 0.0;
     int i;
     for(i=1; i<l->num_points; i++) {
         len += ssdb_point_distance(l->points[i-1], l->points[i]);
     }
     return len;
+}
+
+ssdb_bbox_t* ssdb_linestr_bbox(ssdb_linestr_t* l) {
+    int i;
+    ssdb_point_t* p;
+    ssdb_bbox_t* pb;
+    ssdb_bbox_t* b = ssdb_bbox_new();
+    for(i=0; i<l->num_points; i++) {
+        p = l->points[i];
+        pb = ssdb_point_bbox(p);
+        ssdb_bbox_extend(b, pb);
+        ssdb_bbox_destroy(pb);
+    }
+    return b;
+}
+
+ssdb_bbox_t* ssdb_bbox_new(void) {
+    ssdb_bbox_t* b = malloc(sizeof(ssdb_bbox_t));
+    if(b == NULL) abort();
+    ssdb_bbox_init(b);
+    return b;
+}
+
+ssdb_bbox_t* ssdb_bbox_destroy(ssdb_bbox_t* b) {
+    free(b);
+    b = NULL;
+    return b;
+}
+
+void ssdb_bbox_init(ssdb_bbox_t* b) {
+    b->latmin = GEOM_UNSET;
+    b->lonmin = GEOM_UNSET;
+    b->latmax = GEOM_UNSET;
+    b->lonmax = GEOM_UNSET;
+}
+
+void ssdb_bbox_extend(ssdb_bbox_t* b0, ssdb_bbox_t* b1) {
+    if(b0->latmin == GEOM_UNSET || b0->latmin > b1->latmin) {
+        b0->latmin = b1->latmin;
+    }
+    if(b0->lonmin == GEOM_UNSET || b0->lonmin > b1->lonmin) {
+        b0->lonmin = b1->lonmin;
+    }
+    if(b0->latmax == GEOM_UNSET || b0->latmax < b1->latmax) {
+        b0->latmax = b1->latmax;
+    }
+    if(b0->lonmax == GEOM_UNSET || b0->lonmax < b1->lonmax) {
+        b0->lonmax = b1->lonmax;
+    }
+    return;
 }
