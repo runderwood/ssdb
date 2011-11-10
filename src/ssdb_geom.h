@@ -4,7 +4,8 @@
 #define GEOM_NULL 0
 #define GEOM_POINT 1
 #define GEOM_LINESTRING 2
-#define GEOM_POLYGON 4
+#define GEOM_LINEARRING 4
+#define GEOM_POLYGON 8
 
 #define GEOM_LAMBERT_R 298.257223563
 #define GEOM_R_EARTH 6371137.0
@@ -36,7 +37,16 @@ struct ssdb_linestr_s {
 
 typedef struct ssdb_linestr_s ssdb_linestr_t;
 
+struct ssdb_polygon_s {
+    int type;
+    ssdb_linestr_t* external;
+    ssdb_linestr_t* internal;
+};
+
+typedef struct ssdb_polygon_s ssdb_polygon_t;
+
 double ssdb_lambert_flatten(double lat);
+void* ssdb_geom_clone(int t, void* geom);
 
 ssdb_bbox_t* ssdb_bbox_new(void);
 void ssdb_bbox_init(ssdb_bbox_t* b);
@@ -56,6 +66,16 @@ ssdb_linestr_t* ssdb_linestr_new(void);
 void ssdb_linestr_init(ssdb_linestr_t* l);
 ssdb_linestr_t* ssdb_linestr_destroy(ssdb_linestr_t* l);
 ssdb_bbox_t* ssdb_linestr_bbox(ssdb_linestr_t* p);
+
+ssdb_point_t* ssdb_linestr_head(ssdb_linestr_t* l);
+ssdb_point_t* ssdb_linestr_tail(ssdb_linestr_t* l);
+int ssdb_linestr_ring(ssdb_linestr_t* l);
+double ssdb_linestr_ringarea(ssdb_linestr_t* l);
+
+ssdb_polygon_t* ssdb_polygon_new(void);
+void ssdb_polygon_init(ssdb_polygon_t* p);
+ssdb_polygon_t* ssdb_polygon_destroy(ssdb_polygon_t* p);
+ssdb_polygon_t* ssdb_polygon_rdestroy(ssdb_polygon_t* p);
 
 double ssdb_linestr_length(ssdb_linestr_t* l);
 int ssdb_linestr_append(ssdb_linestr_t* l, ssdb_point_t* p);

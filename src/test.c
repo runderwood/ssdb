@@ -56,17 +56,51 @@ static void test_linestrs(int num, int max_points) {
 }
 
 static void test_distance() {
-        ssdb_point_t* p0 = ssdb_point_new();
-        p0->lat = 42.357778;
-        p0->lon = -71.061667;
-        ssdb_point_t* p1 = ssdb_point_new();
-        p1->lat = 29.762778;
-        p1->lon = -95.383056;
-        double d = ssdb_point_distance(p0, p1);
-        printf("distance from %f,%f to %f,%f = %f\n", p0->lat, p0->lon, p1->lat, p1->lon, d);
-        p0 = ssdb_point_destroy(p0);
-        p1 = ssdb_point_destroy(p1);
-        return;
+    ssdb_point_t* p0 = ssdb_point_new();
+    p0->lat = 42.357778;
+    p0->lon = -71.061667;
+    ssdb_point_t* p1 = ssdb_point_new();
+    p1->lat = 29.762778;
+    p1->lon = -95.383056;
+    double d = ssdb_point_distance(p0, p1);
+    printf("distance from %f,%f to %f,%f = %f\n", p0->lat, p0->lon, p1->lat, p1->lon, d);
+    p0 = ssdb_point_destroy(p0);
+    p1 = ssdb_point_destroy(p1);
+    return;
+}
+
+static void test_polygon(int max_p, int max_verts) {
+    int i;
+    int j;
+    int verts;
+    double lat;
+    double lon;
+    ssdb_point_t* p_n;
+    ssdb_linestr_t* l0;
+    ssdb_linestr_t* l1;
+    ssdb_polygon_t* p;
+    for(i=0; i<max_p; i++) {
+        printf("making polygon: %d\n", i);
+        do {
+            verts = rand() % max_verts;
+        } while(verts < 3);
+        l0 = ssdb_linestr_new();
+        //l1 = ssdb_linestr_new();
+        for(j=0; j<verts; j++) {
+            lon = (double)((360/2) - (rand()%(int)360));  
+            lat = (double)((180/2) - (rand()%(int)180));
+            p_n = ssdb_point_new();
+            p_n->lon = lon;
+            p_n->lat = lat;
+            ssdb_linestr_append(l0, p_n);
+        }
+        ssdb_linestr_ring(l0);
+        p = ssdb_polygon_new();
+        p->external = l0;
+        printf("\t%d vertices...\n", p->external->num_points-1);
+        p = ssdb_polygon_rdestroy(p);
+    }
+    printf("...done.\n");
 }
 
 int main(int argc, char** argv) {
@@ -75,6 +109,7 @@ int main(int argc, char** argv) {
     //test_points(10, 360, 180);
     test_linestrs(10, 100);
     test_distance();
+    test_polygon(10, 10);
 
     return EXIT_SUCCESS;
 }

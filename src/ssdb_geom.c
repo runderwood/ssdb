@@ -9,6 +9,48 @@ double ssdb_lambert_flatten(double lat) {
     return (psi * 360.0) / (2 * M_PI);
 }
 
+void* ssdb_geom_clone(int geom_type, void* geom) {
+    void * clone;
+    switch(geom_type) {
+        case GEOM_POINT:
+            clone = ssdb_point_new();
+            ((ssdb_point_t*)clone)->lat = ((ssdb_point_t*)geom)->lat;
+            ((ssdb_point_t*)clone)->lon = ((ssdb_point_t*)geom)->lon;
+            break;
+        case GEOM_LINESTRING:
+        case GEOM_LINEARRING:
+            clone = ssdb_linestr_new();
+            int i;
+            for(i=0; i<((ssdb_linestr_t*)geom)->num_points; i++) {
+                ssdb_linestr_append(
+                    clone, 
+                    ssdb_geom_clone(
+                        ((ssdb_linestr_t*)geom)->type, 
+                        ((ssdb_linestr_t*)geom)->points[i]
+                    )
+                );
+            }
+            break;
+        case GEOM_POLYGON:
+            clone = ssdb_polygon_new();
+            if(((ssdb_polygon_t*)geom)->external != NULL)
+                ((ssdb_polygon_t*)clone)->external = ssdb_geom_clone(
+                    ((ssdb_polygon_t*)geom)->external->type, 
+                    ((ssdb_polygon_t*)geom)->external
+                );
+            if(((ssdb_polygon_t*)geom)->internal != NULL) 
+                ((ssdb_polygon_t*)clone)->internal = ssdb_geom_clone(
+                    ((ssdb_polygon_t*)geom)->internal->type, 
+                    ((ssdb_polygon_t*)geom)->internal
+                );
+            break;
+        default:
+            clone = NULL;
+            break;
+    }
+    return clone;
+}
+
 void ssdb_point_init(ssdb_point_t* p) {
     p->type = GEOM_POINT;
     p->lat = 0.00;
@@ -39,7 +81,8 @@ double ssdb_point_distance(ssdb_point_t* p1, ssdb_point_t* p2) {
     lon_h *= lon_h;
     double lat_h = sin(lat_arc*0.5);
     lat_h *= lat_h;
-    double d = 2 * asin(sqrt(lat_h + cos(p1->lat*M_PI/180.0)*cos(p2->lat*M_PI/180.0) * lon_h)) * GEOM_R_EARTH;
+    double d = 2 * asin(sqrt(lat_h + cos(p1->lat*M_PI/180.0) * 
+        cos(p2->lat*M_PI/180.0) * lon_h)) * GEOM_R_EARTH;
     return d;
 }
 
@@ -52,7 +95,8 @@ double ssdb_point_distance_lambert(ssdb_point_t* p1, ssdb_point_t* p2) {
     lon_h *= lon_h;
     double lat_h = sin(lat_arc*0.5);
     lat_h *= lat_h;
-    double d = 2 * asin(sqrt(lat_h + cos(flat_lat1*M_PI/180.0)*cos(flat_lat2*M_PI/180.0) * lon_h)) * GEOM_R_EARTH;
+    double d = 2 * asin(sqrt(lat_h + cos(flat_lat1*M_PI/180.0) *
+        cos(flat_lat2*M_PI/180.0) * lon_h)) * GEOM_R_EARTH;
     return d;
 }
 
@@ -123,6 +167,64 @@ ssdb_bbox_t* ssdb_linestr_bbox(ssdb_linestr_t* l) {
         ssdb_bbox_destroy(pb);
     }
     return b;
+}
+
+ssdb_point_t* ssdb_linestr_head(ssdb_linestr_t* l) {
+    return l->points[0];
+}
+
+ssdb_point_t* ssdb_linestr_tail(ssdb_linestr_t* l) {
+    return l->points[l->num_points-1];
+}
+
+int ssdb_linestr_ring(ssdb_linestr_t* l) {
+    if(l->num_points < 3) return -1;
+    ssdb_point_t* p0 = ssdb_linestr_head(l);
+    ssdb_point_t* p1 = ssdb_linestr_tail(l);
+    if(!ssdb_point_equals(p0, p1)) {
+        ssdb_linestr_append(l,ssdb_geom_clone(p0->type,p0));
+    }
+    l->type = GEOM_LINEARRING;
+    return 0;
+}
+
+/*
+double ssdb_linestr_ringarea(ssdb_linestr_t* l) {
+    double area = GEOM_UNSET;
+    int v;
+    if(ssdb_linestr_ring(l) == 0) {
+        for(v=2; v<l->num_points; v += 2) {
+            
+        }
+    }
+    return area;
+}
+*/
+ 
+ssdb_polygon_t* ssdb_polygon_new(void) {
+    ssdb_polygon_t* p = malloc(sizeof(ssdb_polygon_t));
+    if(p == NULL) abort();
+    ssdb_polygon_init(p);
+    return p;
+}
+
+void ssdb_polygon_init(ssdb_polygon_t* p) {
+    p->type = GEOM_POLYGON;
+    p->external = NULL;
+    p->internal = NULL;
+    return;
+}
+
+ssdb_polygon_t* ssdb_polygon_destroy(ssdb_polygon_t* p) {
+    free(p);
+    p = NULL;
+    return p;
+}
+
+ssdb_polygon_t* ssdb_polygon_rdestroy(ssdb_polygon_t* p) {
+    if(p->internal != NULL) ssdb_linestr_destroy(p->internal);
+    if(p->external != NULL) ssdb_linestr_destroy(p->external);
+    return ssdb_polygon_destroy(p);
 }
 
 ssdb_bbox_t* ssdb_bbox_new(void) {
